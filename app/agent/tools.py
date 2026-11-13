@@ -1,10 +1,13 @@
 import ast
 import operator
+import logging
 
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool, tool
 
 from app.interfaces import KnowledgeBase, WebSearcher
+
+logger = logging.getLogger(__name__)
 
 _OPS = {
     ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul,
@@ -28,25 +31,33 @@ def build_tools(kb: KnowledgeBase, web: WebSearcher, top_k: int = 5) -> list[Bas
     async def search_knowledge_base(query: str, config: RunnableConfig) -> str:
         """Search the user's uploaded documents. Use it first for any question
         that may relate to the user's files."""
-        fragments = await kb.search(config["configurable"]["user_id"], query, k=top_k)
+        user_id = config["configurable"]["user_id"]
+        logger.info("tool search_knowledge_base user=%s", user_id)
+        logger.debug("query: %s", query)
+        fragments = await kb.search(user_id, query, k=top_k)
         if not fragments:
-            return "Nothing found in the db."
+            return "В базе знаний ничего не найдено."
         return "\n\n".join(f"[{f.source}]\n{f.text}" for f in fragments)
 
     @tool
     async def web_search(query: str) -> str:
         """Search the internet for fresh information: news, prices, current events."""
+        logger.info("tool web_search")
+        logger.debug("query: %s", query)
         try:
             return await web.search(query)
         except Exception as exc:
-            return f"Web-search is anavailable: {exc}"
+            logger.warning("web_search failed: %s", exc)
+            return f"Веб-поиск недоступен: {exc}"
 
     @tool
     def calculator(expression: str) -> str:
         """Evaluate an arithmetic expression, e.g. '(15 + 27) * 3 / 4'. Supports + - * / ** %."""
+        logger.info("tool calculator")
+        logger.debug("expression: %s", expression)
         try:
             return str(_calc(ast.parse(expression, mode="eval").body))
         except Exception:
-            return "Error: cannot calculate an expression."
-
+            logger.warning("calculator failed to evaluate expression")
+            return "Ошибка: не удалось вычислить выражение."
     return [search_knowledge_base, web_search, calculator]

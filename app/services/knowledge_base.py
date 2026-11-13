@@ -1,6 +1,8 @@
 import asyncio
 from pathlib import Path
-
+import logging
+import time
+    
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
@@ -10,6 +12,7 @@ from qdrant_client.http import models as qm
 
 from app.interfaces import Fragment, KnowledgeBase
 
+logger = logging.getLogger(__name__)
 
 class QdrantKnowledgeBase(KnowledgeBase):
     """RAG-хранилище на Qdrant. Документы привязаны к user_id."""
@@ -41,15 +44,22 @@ class QdrantKnowledgeBase(KnowledgeBase):
 
     async def add_file(self, user_id: int, path: Path, name: str) -> int:
         chunks = await asyncio.to_thread(self._load_and_split, user_id, path, name)
+        logger.debug("split %s into %d chunks", name, len(chunks))
         await asyncio.to_thread(self._store.add_documents, chunks)
+        logger.info("indexed file=%s user=%s chunks=%d", name, user_id, len(chunks))
         return len(chunks)
 
     async def search(self, user_id: int, query: str, k: int = 5) -> list[Fragment]:
         only_user = qm.Filter(
             must=[qm.FieldCondition(key="metadata.user_id", match=qm.MatchValue(value=user_id))]
         )
+        started = time.perf_counter()
         docs = await asyncio.to_thread(
             self._store.similarity_search, query, k=k, filter=only_user
+        )
+        logger.info(
+            "kb search user=%s k=%d found=%d time=%.2fs",
+            user_id, k, len(docs), time.perf_counter() - started,
         )
         return [Fragment(text=d.page_content, source=d.metadata["source"]) for d in docs]
 

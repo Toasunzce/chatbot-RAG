@@ -9,14 +9,19 @@ from app import config
 from app.agent.graph import build_agent
 from app.agent.tools import build_tools
 from app.bot.handlers import router
+from app.logging_config import setup_logging
 from app.services.knowledge_base import QdrantKnowledgeBase
 from app.services.web import DuckDuckGoSearcher
 
+logger = logging.getLogger(__name__)
+
 
 async def main() -> None:
-    logging.basicConfig(level=logging.INFO)
+    setup_logging(config.LOG_LEVEL, config.LOG_FILE)
+    logger.info("Launching: llm=%s embeddings=%s", config.LLM_MODEL, config.EMBEDDING_MODEL)
 
     # --- здесь, и только здесь, выбираются конкретные реализации ---
+    logger.info("Loading knowledge base (first run downloads the embedding model)...")
     kb = QdrantKnowledgeBase(
         path=config.QDRANT_PATH,
         collection=config.COLLECTION,
@@ -38,11 +43,16 @@ async def main() -> None:
         dp.workflow_data.update(agent=agent, kb=kb)
         dp.include_router(router)
 
+        logger.info("Bot is up!")
         try:
             await dp.start_polling(bot)
         finally:
             await bot.session.close()
+            logger.info("Bot stopped")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass

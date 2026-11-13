@@ -1,5 +1,6 @@
 import logging
 import tempfile
+import time
 from pathlib import Path
 
 from aiogram import Bot, F, Router
@@ -25,9 +26,22 @@ START_TEXT = (
 )
 
 
+def _tools_used(messages: list) -> list[str]:
+    """Имена инструментов, вызванных в текущем ходе (после последнего сообщения пользователя)."""
+    used = []
+    for message in reversed(messages):
+        if message.type == "human":
+            break
+        if message.type == "tool":
+            used.append(message.name)
+    return list(reversed(used))
+
+
 @router.message(CommandStart())
 async def start(message: Message, agent) -> None:
-    await agent.checkpointer.adelete_thread(str(message.from_user.id))
+    user_id = message.from_user.id
+    await agent.checkpointer.adelete_thread(str(user_id))
+    logger.info("/start user=%s (history reset)", user_id)
     await message.answer(START_TEXT)
 
 
@@ -46,22 +60,28 @@ async def ask_text(message: Message, bot: Bot, agent) -> None:
 
 async def answer_question(message: Message, bot: Bot, agent, text: str) -> None:
     user_id = message.from_user.id
+    web = user_id in web_enabled
     config = {
-        "configurable": {
-            "thread_id": str(user_id),
-            "user_id": user_id,
-            "web": user_id in web_enabled,
-        },
+        "configurable": {"thread_id": str(user_id), "user_id": user_id, "web": web},
         "recursion_limit": 12,
     }
+    logger.info("question user=%s web=%s len=%d", user_id, web, len(text))
+
+    started = time.perf_counter()
     try:
         async with ChatActionSender.typing(bot=bot, chat_id=message.chat.id):
             result = await agent.ainvoke({"messages": [("user", text)]}, config)
     except Exception:
-        logger.exception("agent failed")
+        logger.exception("agent failed user=%s", user_id)
         await message.answer("⚠️ Не удалось получить ответ, попробуйте ещё раз.")
         return
-    await message.answer(result["messages"][-1].content[:4000])
+
+    answer = result["messages"][-1].content
+    logger.info(
+        "answer user=%s tools=%s time=%.2fs len=%d",
+        user_id, _tools_used(result["messages"]), time.perf_counter() - started, len(answer),
+    )
+    await message.answer(answer[:4000])
 
 
 @router.message(Command("parse"))
@@ -75,12 +95,14 @@ async def parse(message: Message) -> None:
 
 @router.callback_query(F.data.startswith("parse:"))
 async def parse_toggle(callback: CallbackQuery) -> None:
+    user_id = callback.from_user.id
     if callback.data == "parse:on":
-        web_enabled.add(callback.from_user.id)
+        web_enabled.add(user_id)
         text = "✅ Веб-поиск включён."
     else:
-        web_enabled.discard(callback.from_user.id)
+        web_enabled.discard(user_id)
         text = "❌ Веб-поиск выключен."
+    logger.info("web search user=%s enabled=%s", user_id, user_id in web_enabled)
     await callback.answer()
     await callback.message.edit_text(text)
 
@@ -88,6 +110,7 @@ async def parse_toggle(callback: CallbackQuery) -> None:
 @router.message(Command("rag"))
 async def rag(message: Message) -> None:
     awaiting_file.add(message.from_user.id)
+    logger.info("/rag user=%s waiting for file", message.from_user.id)
     await message.answer("📂 Отправьте .txt, .md или .pdf файл.")
 
 
@@ -99,18 +122,24 @@ async def document(message: Message, bot: Bot, kb: KnowledgeBase) -> None:
         return
 
     name = Path(message.document.file_name or "document").name
+    started = time.perf_counter()
     try:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / name
             await bot.download(message.document, destination=path)
             count = await kb.add_file(user_id, path, name)
     except ValueError:
+        logger.warning("unsupported file user=%s name=%s", user_id, name)
         await message.answer("⚠️ Формат не поддерживается.")
         return
     except Exception:
-        logger.exception("ingest failed")
+        logger.exception("ingest failed user=%s name=%s", user_id, name)
         await message.answer("⚠️ Ошибка при обработке файла.")
         return
 
     awaiting_file.discard(user_id)
+    logger.info(
+        "file added user=%s name=%s chunks=%d time=%.2fs",
+        user_id, name, count, time.perf_counter() - started,
+    )
     await message.answer(f"✅ «{name}» добавлен в базу ({count} фрагментов).")

@@ -4,6 +4,7 @@ from langchain_core.tools import BaseTool
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
+from langchain_core.runnables import RunnableConfig
 
 
 # TODO: replace SYSTEM_PROMPT
@@ -24,7 +25,7 @@ def build_agent(llm: BaseChatModel, tools: list[BaseTool], max_history: int = 20
     llm_base = llm.bind_tools(base_tools)
     llm_web = llm.bind_tools(tools)
 
-    async def agent_node(state: MessagesState, config: dict):
+    async def agent_node(state: MessagesState, config: RunnableConfig):
         web_on = config["configurable"].get("web", False)
         history = trim_messages(
             state["messages"],
@@ -33,7 +34,7 @@ def build_agent(llm: BaseChatModel, tools: list[BaseTool], max_history: int = 20
             max_tokens=max_history,
             start_on="human",
         )
-        response = await (llm_web if web_on else llm_base).ainvoke([SYSTEM_PROMPT, *history])
+        response = await (llm_web if web_on else llm_base).ainvoke([SYSTEM_PROMPT, *history], config)
         return {"messages": [response]}
 
     graph = StateGraph(MessagesState)
