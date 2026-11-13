@@ -38,7 +38,7 @@ docs/
 
 ## Запуск
 
-Предварительно необходимо получить токен бота от [@BotFather](https://t.me/BotFather), а также ключ [Groq](https://console.groq.com). Конфигурация, включая LLM [gpt-oss-120b](https://console.groq.com/docs/model/openai/gpt-oss-120b) актуальна на момент 13.11.2026.
+Предварительно необходимо получить токен бота от [@BotFather](https://t.me/BotFather), а также ключ [Groq](https://console.groq.com). Конфигурация, включая LLM [gpt-oss-120b](https://console.groq.com/docs/model/openai/gpt-oss-120b), актуальна на момент 13.11.2026.
 
 ```bash
 git clone https://github.com/Toasunzce/chatbot-RAG.git
