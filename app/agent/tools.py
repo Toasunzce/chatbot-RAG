@@ -29,8 +29,8 @@ def _calc(node):
 def build_tools(kb: KnowledgeBase, web: WebSearcher, top_k: int = 5) -> list[BaseTool]:
     @tool
     async def search_knowledge_base(query: str, config: RunnableConfig) -> str:
-        """Search the user's uploaded documents. Use it first for any question
-        that may relate to the user's files."""
+        """Поиск загруженных документов, загруженных пользователем. Использовать для вопросов,
+        которые могут быть релевантны к загруженным пользователем файлам."""
         user_id = config["configurable"]["user_id"]
         logger.info("tool search_knowledge_base user=%s", user_id)
         logger.debug("query: %s", query)
@@ -41,7 +41,7 @@ def build_tools(kb: KnowledgeBase, web: WebSearcher, top_k: int = 5) -> list[Bas
 
     @tool
     async def web_search(query: str) -> str:
-        """Search the internet for fresh information: news, prices, current events."""
+        """Поиск свежей информации в интернете: новости, цены, текущие события."""
         logger.info("tool web_search")
         logger.debug("query: %s", query)
         try:
@@ -52,7 +52,7 @@ def build_tools(kb: KnowledgeBase, web: WebSearcher, top_k: int = 5) -> list[Bas
 
     @tool
     def calculator(expression: str) -> str:
-        """Evaluate an arithmetic expression, e.g. '(15 + 27) * 3 / 4'. Supports + - * / ** %."""
+        """Вычислить результат арифметического выражения, например '(15 + 27) * 3 / 4'. Поддерживает + - * / ** %."""
         logger.info("tool calculator")
         logger.debug("expression: %s", expression)
         try:
