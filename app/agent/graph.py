@@ -20,7 +20,7 @@ SYSTEM_PROMPT = SystemMessage(
 
 
 def build_agent(llm: BaseChatModel, tools: list[BaseTool], max_history: int = 20):
-    """ReAct-агент: agent → (tools → agent)* → END. LLM и инструменты передаются снаружи."""
+    """ReAct-агент: agent -> (tools -> agent)* -> END"""
     base_tools = [t for t in tools if t.name != "web_search"]
     llm_base = llm.bind_tools(base_tools)
     llm_web = llm.bind_tools(tools)
