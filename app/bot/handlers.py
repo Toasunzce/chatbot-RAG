@@ -14,8 +14,8 @@ from app.interfaces import KnowledgeBase
 logger = logging.getLogger(__name__)
 router = Router()
 
-web_enabled: set[int] = set()    # у кого включён веб-поиск
-awaiting_file: set[int] = set()  # кто сейчас должен прислать файл после /rag
+web_enabled: set[int] = set()
+awaiting_file: set[int] = set()
 
 START_TEXT = (
     "👋 Привет! Я AI-агент: сам решаю, когда искать в ваших документах, "
