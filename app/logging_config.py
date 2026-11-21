@@ -22,5 +22,5 @@ def setup_logging(level: str = "INFO", log_file: str | None = None) -> None:
     root.setLevel(level.upper())
     root.handlers = handlers
 
-    for name in _NOISY_LIBS:  # шумные библиотеки пишем только от WARNING
+    for name in _NOISY_LIBS:
         logging.getLogger(name).setLevel(logging.WARNING)
