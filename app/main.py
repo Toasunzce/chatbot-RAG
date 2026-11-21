@@ -20,7 +20,6 @@ async def main() -> None:
     setup_logging(config.LOG_LEVEL, config.LOG_FILE)
     logger.info("Launching: llm=%s embeddings=%s", config.LLM_MODEL, config.EMBEDDING_MODEL)
 
-    # --- здесь, и только здесь, выбираются конкретные реализации ---
     logger.info("Loading knowledge base (first run downloads the embedding model)...")
     kb = QdrantKnowledgeBase(
         path=config.QDRANT_PATH,
